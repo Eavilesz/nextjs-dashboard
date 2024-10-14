@@ -6,6 +6,12 @@ import { lusitana } from '@/app/ui/fonts';
 import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
 import { Suspense } from 'react';
 import { fetchInvoicesPages } from '@/app/lib/data';
+import { Metadata } from 'next';
+
+// We are using a template so that we can have this form ot title being programatically generate per page.
+export const metadata: Metadata = {
+  title: 'Invoices',
+};
 
 // we use search params since it's a server component. In a client component we use the useSearchParams() hook.
 export default async function Page({
