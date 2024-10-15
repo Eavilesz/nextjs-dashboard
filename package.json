@@ -1,10 +1,11 @@
 {
   "private": true,
   "scripts": {
-    "build": "next build && prisma generate",
+    "build": "next build",
     "dev": "next dev",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@heroicons/react": "^2.1.4",
