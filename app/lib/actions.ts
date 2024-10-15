@@ -1,11 +1,14 @@
 'use server';
 
 import { z } from 'zod';
-import { sql } from '@vercel/postgres';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { signIn } from '@/auth';
 import { AuthError } from 'next-auth';
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export type State = {
   errors?: {
@@ -53,22 +56,28 @@ export async function createInvoice(prevState: State, formData: FormData) {
     status: formData.get('status'),
   });
 
-  //   Converting to cents to avoid JS floating point errors
+  // Converting to cents to avoid JS floating point errors
   const amountInCents = amount * 100;
-  const date = new Date().toISOString().split('T')[0];
+  const date = new Date().toISOString().split('T')[0]; // Formatting the date in YYYY-MM-DD format
 
   try {
-    await sql`
-  INSERT INTO  invoices (customer_id, amount, status, date)
-  VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-  `;
+    // Use Prisma's create method to insert data
+    await prisma.invoices.create({
+      data: {
+        customer_id: customerId,
+        amount: amountInCents,
+        status: status,
+        date: new Date(date), // Using Prisma's Date type handling
+      },
+    });
   } catch (error) {
+    console.error('Database Error:', error);
     return {
       message: 'Database Error: Failed to create invoice.',
     };
   }
 
-  // We are modifying the data displayed so, we'll need to clear the cache and trigger a new request to the server.
+  // Invalidate cache and redirect
   revalidatePath('/dashboard/invoices');
   redirect('/dashboard/invoices');
 }
@@ -78,6 +87,7 @@ export async function updateInvoice(
   prevState: State,
   formData: FormData
 ) {
+  // Validate form data with your schema
   const validatedFields = UpdateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
@@ -93,30 +103,43 @@ export async function updateInvoice(
 
   const { customerId, amount, status } = validatedFields.data;
 
+  // Convert amount to cents to avoid JS floating-point errors
   const amountInCents = amount * 100;
 
   try {
-    await sql`
-    UPDATE invoices
-    SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
-    WHERE id = ${id}
-    `;
+    // Use Prisma's update method to update the invoice
+    await prisma.invoices.update({
+      where: { id: id },
+      data: {
+        customer_id: customerId,
+        amount: amountInCents,
+        status: status,
+      },
+    });
   } catch (error) {
+    console.error('Database Error:', error);
     return {
-      Message: 'Database error: Failed to update invoice.',
+      message: 'Database error: Failed to update invoice.',
     };
   }
 
-  revalidatePath('dashboard/invoices');
+  // Revalidate and redirect
+  revalidatePath('/dashboard/invoices');
   redirect('/dashboard/invoices');
 }
 
 export async function deleteInvoice(id: string) {
   try {
-    await sql`DELETE FROM invoices WHERE id = ${id}`;
-    revalidatePath('dashboard/invoices');
-    return { message: 'Delete Invoice.' };
+    // Use Prisma's delete method to remove the invoice
+    await prisma.invoices.delete({
+      where: { id: id },
+    });
+
+    // Revalidate and notify after deletion
+    revalidatePath('/dashboard/invoices');
+    return { message: 'Invoice deleted successfully.' };
   } catch (error) {
+    console.error('Database Error:', error);
     return {
       message: 'Database Error: Failed to delete invoice.',
     };
